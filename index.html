@@ -56,23 +56,13 @@
             color: #e53e3e;
             font-size: 14px;
         }
-        .password-toggle {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-        }
-        .password-container {
-            position: relative;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cold Call Tool</h1>
-       
-        <!-- Main App (Hidden Until Authenticated) -->
+
+        <!-- Main App Section -->
         <div id="appSection">
             <!-- Twilio Number Display -->
             <h3>Twilio Number: <span id="displayTwilioNumber"></span></h3>
@@ -96,7 +86,6 @@
 
     <script>
     // DOM Elements
-    const appSection = document.getElementById('appSection');
     const displayTwilioNumber = document.getElementById('displayTwilioNumber');
     const phoneNumberInput = document.getElementById('phoneNumber');
     const pasteBtn = document.getElementById('pasteBtn');
@@ -105,9 +94,8 @@
     const statusText = document.getElementById('statusText');
     const callTimer = document.getElementById('callTimer');
 
-    // Helper functions
+    // Helper Functions
     const isValidPhoneNumber = (phoneNumber) => {
-        // Validate phone number in E.164 format
         const e164Regex = /^\+?[1-9]\d{1,14}$/;
         return e164Regex.test(phoneNumber);
     };
@@ -115,6 +103,11 @@
     const resetCallTimer = () => {
         clearInterval(timerInterval);
         callTimer.textContent = "00:00";
+    };
+
+    const showError = (message) => {
+        errorDisplay.textContent = message;
+        setTimeout(() => errorDisplay.textContent = '', 5000);
     };
 
     // Paste phone number
@@ -131,8 +124,18 @@
     let callStartTime;
     let timerInterval;
 
+    const startCallTimer = () => {
+        callStartTime = new Date();
+        timerInterval = setInterval(() => {
+            const now = new Date();
+            const elapsed = new Date(now - callStartTime);
+            const minutes = elapsed.getUTCMinutes().toString().padStart(2, '0');
+            const seconds = elapsed.getUTCSeconds().toString().padStart(2, '0');
+            callTimer.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    };
+
     callBtn.addEventListener('click', async () => {
-        // Validate phone number before proceeding
         const phoneNumber = phoneNumberInput.value;
         if (!isValidPhoneNumber(phoneNumber)) {
             showError('Invalid phone number. Please enter a valid number in E.164 format.');
@@ -146,9 +149,7 @@
             const response = await fetch('/.netlify/functions/make-call', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    toNumber: phoneNumber
-                })
+                body: JSON.stringify({ toNumber: phoneNumber })
             });
 
             const result = await response.json();
@@ -160,9 +161,8 @@
                 callBtn.classList.remove('call-btn');
                 callBtn.classList.add('clear-btn');
 
-                // End call handling
                 callBtn.addEventListener('click', () => {
-                    resetCallTimer(); // Reset the timer when the call ends
+                    resetCallTimer();
                     statusText.textContent = 'Call ended.';
                     callBtn.textContent = "📞 Start Call";
                     callBtn.classList.remove('clear-btn');
@@ -177,22 +177,6 @@
             callBtn.disabled = false;
         }
     });
-
-    function startCallTimer() {
-        callStartTime = new Date();
-        timerInterval = setInterval(() => {
-            const now = new Date();
-            const elapsed = new Date(now - callStartTime);
-            const minutes = elapsed.getUTCMinutes().toString().padStart(2, '0');
-            const seconds = elapsed.getUTCSeconds().toString().padStart(2, '0');
-            callTimer.textContent = `${minutes}:${seconds}`;
-        }, 1000);
-    }
-
-    function showError(message) {
-        errorDisplay.textContent = message;
-        setTimeout(() => errorDisplay.textContent = '', 5000);
-    }
-</script>
+    </script>
 </body>
 </html>
