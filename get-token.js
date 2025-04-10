@@ -1,8 +1,8 @@
 const Twilio = require('twilio');
 
 exports.handler = async (event, context) => {
-  // Only allow GET requests
-  if (event.httpMethod !== 'GET') {
+  // Validate HTTP method
+  if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       body: JSON.stringify({ error: 'Method Not Allowed' })
@@ -10,48 +10,63 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Use environment variables (set in Netlify) or fallback to empty
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const apiKey = process.env.TWILIO_API_KEY;
-    const apiSecret = process.env.TWILIO_API_SECRET;
-    const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+    // Parse incoming request
+    const { accountSid, authToken } = JSON.parse(event.body);
 
-    // Validate required environment variables
-    if (!accountSid || !apiKey || !apiSecret) {
-      throw new Error('Missing Twilio environment variables');
+    // Validate credentials format
+    if (!accountSid?.startsWith('AC') || !authToken || authToken.length < 32) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Invalid Twilio credentials format' })
+      };
     }
 
-    const client = new Twilio(apiKey, apiSecret, { accountSid });
+    // Generate random client identifier (safe for Twilio)
+    const clientIdentity = `agent_${Math.random().toString(36).substr(2, 8)}`;
 
-    // Create a Voice token (expires in 1 hour)
+    // Create Voice token (expires in 1 hour)
     const token = new Twilio.jwt.ClientToken({
       ttl: 3600,
-      identity: 'user_' + Math.random().toString(36).substr(2, 9) // Random user ID
+      identity: clientIdentity
     });
 
-    // Grant voice capabilities
+    // Add Voice grant (outbound calls only)
     const voiceGrant = new Twilio.jwt.ClientToken.VoiceGrant({
-      outgoingApplicationSid: process.env.TWILIO_APP_SID, // Optional: Your TwiML App SID
-      incomingAllow: true // Allow incoming calls
+      outgoingApplicationSid: process.env.TWILIO_APP_SID, // Optional for custom TwiML
+      incomingAllow: false // Disable incoming calls for security
     });
     token.addGrant(voiceGrant);
+
+    // Test credentials by initializing Twilio client
+    const testClient = new Twilio(accountSid, authToken);
+    await testClient.api.accounts(accountSid).fetch(); // Throws if invalid
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: token.toJwt(),
-        identity: token.identity,
-        twilioNumber
+        identity: clientIdentity,
+        expiresIn: 3600
       })
     };
 
   } catch (error) {
     console.error('Token generation error:', error);
+
+    // Specific error messages for common cases
+    let userMessage = 'Failed to generate token';
+    if (error.message.includes('Authentication Error')) {
+      userMessage = 'Invalid Twilio credentials';
+    } else if (error.message.includes('not found')) {
+      userMessage = 'Account SID not found';
+    }
+
     return {
-      statusCode: 500,
+      statusCode: 401,
       body: JSON.stringify({ 
-        error: error.message || 'Failed to generate token' 
+        error: userMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     };
   }
