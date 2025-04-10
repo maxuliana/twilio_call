@@ -2,52 +2,65 @@
 <html>
 <head>
   <title>Twilio Cold Caller</title>
-  <link rel="stylesheet" href="styles.css">
+  <script src="https://sdk.twilio.com/js/video/releases/2.3.0/twilio-video.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Twilio Cold Caller</h1>
-    <div class="form-group">
-      <input type="text" id="accountSid" placeholder="Twilio Account SID">
-    </div>
-    <div class="form-group">
-      <input type="password" id="authToken" placeholder="Twilio Auth Token">
-    </div>
-    <div class="form-group">
-      <input type="text" id="twilioNumber" placeholder="Your Twilio Phone Number">
-    </div>
-    <div class="form-group">
-      <input type="text" id="toNumber" placeholder="Number to Call (e.g., +1234567890)">
-    </div>
-    <button onclick="makeCall()">Make Call</button>
-    <div id="status"></div>
-  </div>
+  <input type="text" id="toNumber" placeholder="Number to call (e.g., +15195551234)">
+  <button id="callButton">Start Call</button>
+  <button id="hangupButton" disabled>Hang Up</button>
+  <div id="status"></div>
+
   <script>
-    async function makeCall() {
-      const accountSid = document.getElementById('accountSid').value;
-      const authToken = document.getElementById('authToken').value;
-      const twilioNumber = document.getElementById('twilioNumber').value;
-      const toNumber = document.getElementById('toNumber').value;
+    let device;
+    let connection;
 
-      document.getElementById('status').textContent = 'Calling...';
+    // Initialize Twilio Device
+    async function initializeDevice() {
+      const response = await fetch('/.netlify/functions/get-token');
+      const { token } = await response.json();
+      
+      device = new Twilio.Device(token, {
+        codecPreferences: ['opus', 'pcmu'],
+        logLevel: 'debug'
+      });
 
-      try {
-        const response = await fetch('/.netlify/functions/make-call', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountSid, authToken, twilioNumber, toNumber }),
-        });
+      device.on('ready', () => {
+        document.getElementById('status').textContent = 'Ready to call!';
+      });
 
-        const data = await response.json();
-        if (data.success) {
-          document.getElementById('status').textContent = 'Call initiated!';
-        } else {
-          document.getElementById('status').textContent = `Error: ${data.error}`;
-        }
-      } catch (error) {
-        document.getElementById('status').textContent = 'Failed to connect to server.';
-      }
+      device.on('error', (error) => {
+        console.error('Device error:', error);
+        document.getElementById('status').textContent = `Error: ${error.message}`;
+      });
+
+      device.on('disconnect', () => {
+        document.getElementById('hangupButton').disabled = true;
+        document.getElementById('callButton').disabled = false;
+      });
     }
+
+    // Start the call
+    document.getElementById('callButton').addEventListener('click', async () => {
+      const toNumber = document.getElementById('toNumber').value;
+      document.getElementById('status').textContent = 'Calling...';
+      
+      const params = {
+        To: toNumber,
+        Agent: 'browser' // Identifier for browser-based caller
+      };
+
+      connection = await device.connect({ params });
+      document.getElementById('callButton').disabled = true;
+      document.getElementById('hangupButton').disabled = false;
+    });
+
+    // Hang up
+    document.getElementById('hangupButton').addEventListener('click', () => {
+      device.disconnectAll();
+      document.getElementById('status').textContent = 'Call ended.';
+    });
+
+    initializeDevice();
   </script>
 </body>
 </html>
