@@ -2,26 +2,26 @@ const Twilio = require('twilio');
 
 exports.handler = async (event) => {
   try {
-    const { accountSid, authToken, twilioNumber, toNumber } = JSON.parse(event.body);
+    // Use environment variables (set in Netlify)
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const { toNumber } = JSON.parse(event.body);
 
-    // Validate input
-    if (!accountSid || !authToken || !twilioNumber || !toNumber) {
-      throw new Error('Missing required fields.');
+    if (!accountSid || !authToken || !toNumber) {
+      throw new Error('Missing credentials or phone number.');
     }
 
-    // Initialize Twilio client
     const client = new Twilio(accountSid, authToken);
 
-    // Make the call
+    // Use your TwiML Bin URL here (replace with yours)
     const call = await client.calls.create({
-      url: 'https://handler.twilio.com/twiml/EH3eed4a5e8a8681d6d71f2197760a8a34', // Default TwiML (replace with your own)
+      url: 'https://handler.twilio.com/twiml/YOUR_TWIML_BIN_ID',
       to: toNumber,
-      from: twilioNumber,
+      from: process.env.TWILIO_PHONE_NUMBER, // Add this to Netlify env vars
     });
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ success: true, callSid: call.sid }),
     };
   } catch (error) {
