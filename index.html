@@ -3,207 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twilio Caller</title>
+    <title>Cold Call Tool</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
+            max-width: 500px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #2d3748;
-            text-align: center;
+            background: #f7fafc;
         }
         .container {
             background: white;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .number-display {
-            font-size: 24px;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+        h1 {
+            color: #2d3748;
             text-align: center;
-            background: #f9f9f9;
+            font-size: 24px;
         }
-        .keypad {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin: 20px 0;
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-size: 16px;
         }
-        .key {
-            padding: 15px;
-            font-size: 18px;
+        button {
+            background: #4299e1;
+            color: white;
             border: none;
-            border-radius: 5px;
-            background: #e2e8f0;
             cursor: pointer;
-            transition: background 0.2s;
         }
-        .key:hover {
-            background: #cbd5e0;
+        button:hover {
+            background: #3182ce;
         }
-        .key:active {
+        button:disabled {
             background: #a0aec0;
         }
         .call-btn {
-            width: 100%;
-            padding: 15px;
-            font-size: 18px;
             background: #48bb78;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
+            font-weight: bold;
         }
         .call-btn:hover {
             background: #38a169;
         }
-        .paste-btn {
-            width: 100%;
-            padding: 10px;
-            background: #4299e1;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        .paste-btn:hover {
-            background: #3182ce;
-        }
-        .credentials {
-            margin-top: 20px;
-        }
-        .credentials input {
-            width: 100%;
-            padding: 10px;
-            margin: 5px 0;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        .clear-btn {
-            background: #f56565;
-            color: white;
-        }
-        .clear-btn:hover {
-            background: #e53e3e;
+        .error {
+            color: #e53e3e;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Twilio Phone Call</h1>
-        
-        <!-- Phone Number Input -->
-        <div class="number-display" id="phoneNumber"></div>
-        <button class="paste-btn" id="pasteBtn">📋 Paste Phone Number</button>
-        
-        <!-- Keypad -->
-        <div class="keypad">
-            <button class="key" data-number="1">1</button>
-            <button class="key" data-number="2">2</button>
-            <button class="key" data-number="3">3</button>
-            <button class="key" data-number="4">4</button>
-            <button class="key" data-number="5">5</button>
-            <button class="key" data-number="6">6</button>
-            <button class="key" data-number="7">7</button>
-            <button class="key" data-number="8">8</button>
-            <button class="key" data-number="9">9</button>
-            <button class="key" data-number="*">*</button>
-            <button class="key" data-number="0">0</button>
-            <button class="key" data-number="#">#</button>
-        </div>
-        
-        <!-- Clear & Call Buttons -->
-        <button class="key clear-btn" id="clearBtn">Clear</button>
-        <button class="call-btn" id="callBtn">📞 Call via Twilio</button>
+        <h1>Cold Call Tool</h1>
         
         <!-- Twilio Credentials -->
-        <div class="credentials">
-            <h3>Twilio Credentials</h3>
-            <input type="text" id="accountSid" placeholder="Account SID">
-            <input type="text" id="authToken" placeholder="Auth Token">
-            <input type="text" id="twilioNumber" placeholder="Twilio Phone Number (e.g., +1234567890)">
-        </div>
+        <h3>Step 1: Enter Twilio Credentials</h3>
+        <input type="text" id="accountSid" placeholder="Account SID (starts with 'AC')">
+        <input type="text" id="authToken" placeholder="Auth Token">
+        <input type="text" id="twilioNumber" placeholder="Your Twilio Number (e.g., +15551234)">
+        
+        <!-- Phone Number Input -->
+        <h3>Step 2: Enter Phone Number to Call</h3>
+        <input type="text" id="phoneNumber" placeholder="Paste phone number (e.g., +15559876)">
+        <button id="pasteBtn">📋 Paste Phone Number</button>
+        
+        <!-- Call Button -->
+        <button id="callBtn" class="call-btn" disabled>📞 Start Call</button>
+        <p id="error" class="error"></p>
     </div>
 
     <script>
-        const phoneNumberDisplay = document.getElementById('phoneNumber');
+        const accountSidInput = document.getElementById('accountSid');
+        const authTokenInput = document.getElementById('authToken');
+        const twilioNumberInput = document.getElementById('twilioNumber');
+        const phoneNumberInput = document.getElementById('phoneNumber');
         const pasteBtn = document.getElementById('pasteBtn');
-        const clearBtn = document.getElementById('clearBtn');
         const callBtn = document.getElementById('callBtn');
-        const keypadButtons = document.querySelectorAll('.key[data-number]');
-        
-        let phoneNumber = '';
-        
-        // Keypad input
-        keypadButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                phoneNumber += button.getAttribute('data-number');
-                phoneNumberDisplay.textContent = phoneNumber;
-            });
+        const errorDisplay = document.getElementById('error');
+
+        // Enable call button only when all fields are filled
+        function checkFields() {
+            const allFilled = accountSidInput.value && authTokenInput.value && 
+                             twilioNumberInput.value && phoneNumberInput.value;
+            callBtn.disabled = !allFilled;
+        }
+
+        // Auto-check fields on input
+        [accountSidInput, authTokenInput, twilioNumberInput, phoneNumberInput].forEach(input => {
+            input.addEventListener('input', checkFields);
         });
-        
-        // Paste from clipboard
+
+        // Paste phone number
         pasteBtn.addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
-                phoneNumber = text.replace(/\D/g, ''); // Remove non-digits
-                phoneNumberDisplay.textContent = phoneNumber;
+                phoneNumberInput.value = text.replace(/\D/g, ''); // Numbers only
+                checkFields();
             } catch (err) {
-                alert('Failed to paste. Check clipboard permissions.');
+                showError("Couldn't paste. Click inside the box and paste manually.");
             }
         });
-        
-        // Clear number
-        clearBtn.addEventListener('click', () => {
-            phoneNumber = '';
-            phoneNumberDisplay.textContent = '';
-        });
-        
-        // Initiate Twilio Call (via Netlify Function)
+
+        // Make call via Netlify Function
         callBtn.addEventListener('click', async () => {
-            const accountSid = document.getElementById('accountSid').value;
-            const authToken = document.getElementById('authToken').value;
-            const twilioNumber = document.getElementById('twilioNumber').value;
-            
-            if (!phoneNumber || !accountSid || !authToken || !twilioNumber) {
-                alert('Please fill in all fields!');
-                return;
-            }
-            
+            callBtn.disabled = true;
+            callBtn.textContent = "Calling...";
+            errorDisplay.textContent = "";
+
             try {
-                const response = await fetch('/.netlify/functions/twilio-call', {
+                const response = await fetch('/.netlify/functions/make-call', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        accountSid,
-                        authToken,
-                        twilioNumber,
-                        toNumber: phoneNumber
+                        accountSid: accountSidInput.value,
+                        authToken: authTokenInput.value,
+                        twilioNumber: twilioNumberInput.value,
+                        toNumber: phoneNumberInput.value
                     })
                 });
-                
+
                 const result = await response.json();
-                
                 if (result.success) {
-                    alert(`Calling ${phoneNumber}...`);
+                    alert(`Calling ${phoneNumberInput.value}...`);
                 } else {
-                    alert('Error: ' + (result.error || 'Failed to call'));
+                    showError(result.error || "Call failed. Check credentials.");
                 }
             } catch (err) {
-                alert('Network error. Check console.');
-                console.error(err);
+                showError("Network error. Try again.");
+            } finally {
+                callBtn.textContent = "📞 Start Call";
+                callBtn.disabled = false;
             }
         });
+
+        function showError(message) {
+            errorDisplay.textContent = message;
+        }
     </script>
 </body>
 </html>
