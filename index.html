@@ -112,112 +112,104 @@
     </div>
 
     <script>
-        // DOM Elements
-        const adminPasswordInput = document.getElementById('adminPassword');
-        const authBtn = document.getElementById('authBtn');
-        const authError = document.getElementById('authError');
-        const appSection = document.getElementById('appSection');
-        const displayTwilioNumber = document.getElementById('displayTwilioNumber');
-        const phoneNumberInput = document.getElementById('phoneNumber');
-        const pasteBtn = document.getElementById('pasteBtn');
-        const callBtn = document.getElementById('callBtn');
-        const errorDisplay = document.getElementById('error');
-        const statusText = document.getElementById('statusText');
-        const callTimer = document.getElementById('callTimer');
-        const togglePassword = document.getElementById('togglePassword');
+    // DOM Elements
+    const appSection = document.getElementById('appSection');
+    const displayTwilioNumber = document.getElementById('displayTwilioNumber');
+    const phoneNumberInput = document.getElementById('phoneNumber');
+    const pasteBtn = document.getElementById('pasteBtn');
+    const callBtn = document.getElementById('callBtn');
+    const errorDisplay = document.getElementById('error');
+    const statusText = document.getElementById('statusText');
+    const callTimer = document.getElementById('callTimer');
 
-        // Password visibility toggle
-        togglePassword.addEventListener('click', () => {
-            const type = adminPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            adminPasswordInput.setAttribute('type', type);
-            togglePassword.textContent = type === 'password' ? '👁️' : '👁️‍🗨️';
-        });
+    // Helper functions
+    const isValidPhoneNumber = (phoneNumber) => {
+        // Validate phone number in E.164 format
+        const e164Regex = /^\+?[1-9]\d{1,14}$/;
+        return e164Regex.test(phoneNumber);
+    };
 
-        // System Authentication
-        authBtn.addEventListener('click', async () => {
-            const password = adminPasswordInput.value;
-            
-            try {
-                const response = await fetch('/.netlify/functions/verify-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
+    const resetCallTimer = () => {
+        clearInterval(timerInterval);
+        callTimer.textContent = "00:00";
+    };
 
-                const data = await response.json();
-                
-                if (data.authenticated) {
-                    displayTwilioNumber.textContent = data.twilioNumber;
-                    appSection.style.display = 'block';
-                    document.querySelector('.auth-section').style.display = 'none';
-                } else {
-                    authError.textContent = 'Invalid password';
-                }
-            } catch (err) {
-                authError.textContent = 'Authentication service unavailable';
-            }
-        });
+    // Paste phone number
+    pasteBtn.addEventListener('click', async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            phoneNumberInput.value = text.replace(/\D/g, '');
+        } catch (err) {
+            showError("Couldn't paste. Please paste manually.");
+        }
+    });
 
-        // Paste phone number
-        pasteBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                phoneNumberInput.value = text.replace(/\D/g, '');
-            } catch (err) {
-                showError("Couldn't paste. Please paste manually.");
-            }
-        });
+    // Call Management
+    let callStartTime;
+    let timerInterval;
 
-        // Call Management
-        let callStartTime;
-        let timerInterval;
-
-        callBtn.addEventListener('click', async () => {
-            try {
-                callBtn.disabled = true;
-                statusText.textContent = "Connecting...";
-                
-                const response = await fetch('/.netlify/functions/make-call', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        toNumber: phoneNumberInput.value
-                    })
-                });
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    startCallTimer();
-                    statusText.textContent = `Call connected to ${phoneNumberInput.value}`;
-                    callBtn.textContent = "🛑 End Call";
-                    callBtn.classList.remove('call-btn');
-                    callBtn.classList.add('clear-btn');
-                } else {
-                    showError(result.error || "Call failed");
-                }
-            } catch (err) {
-                showError("Network error. Try again.");
-            } finally {
-                callBtn.disabled = false;
-            }
-        });
-
-        function startCallTimer() {
-            callStartTime = new Date();
-            timerInterval = setInterval(() => {
-                const now = new Date();
-                const elapsed = new Date(now - callStartTime);
-                const minutes = elapsed.getUTCMinutes().toString().padStart(2, '0');
-                const seconds = elapsed.getUTCSeconds().toString().padStart(2, '0');
-                callTimer.textContent = `${minutes}:${seconds}`;
-            }, 1000);
+    callBtn.addEventListener('click', async () => {
+        // Validate phone number before proceeding
+        const phoneNumber = phoneNumberInput.value;
+        if (!isValidPhoneNumber(phoneNumber)) {
+            showError('Invalid phone number. Please enter a valid number in E.164 format.');
+            return;
         }
 
-        function showError(message) {
-            errorDisplay.textContent = message;
-            setTimeout(() => errorDisplay.textContent = '', 5000);
+        try {
+            callBtn.disabled = true;
+            statusText.textContent = "Connecting...";
+
+            const response = await fetch('/.netlify/functions/make-call', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    toNumber: phoneNumber
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                startCallTimer();
+                statusText.textContent = `Call connected to ${phoneNumber}`;
+                callBtn.textContent = "🛑 End Call";
+                callBtn.classList.remove('call-btn');
+                callBtn.classList.add('clear-btn');
+
+                // End call handling
+                callBtn.addEventListener('click', () => {
+                    resetCallTimer(); // Reset the timer when the call ends
+                    statusText.textContent = 'Call ended.';
+                    callBtn.textContent = "📞 Start Call";
+                    callBtn.classList.remove('clear-btn');
+                    callBtn.classList.add('call-btn');
+                }, { once: true });
+            } else {
+                showError(result.error || "Call failed");
+            }
+        } catch (err) {
+            showError("Network error. Try again.");
+        } finally {
+            callBtn.disabled = false;
         }
-    </script>
+    });
+
+    function startCallTimer() {
+        callStartTime = new Date();
+        timerInterval = setInterval(() => {
+            const now = new Date();
+            const elapsed = new Date(now - callStartTime);
+            const minutes = elapsed.getUTCMinutes().toString().padStart(2, '0');
+            const seconds = elapsed.getUTCSeconds().toString().padStart(2, '0');
+            callTimer.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+
+    function showError(message) {
+        errorDisplay.textContent = message;
+        setTimeout(() => errorDisplay.textContent = '', 5000);
+    }
+</script>
 </body>
 </html>
