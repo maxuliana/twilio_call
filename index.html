@@ -56,96 +56,167 @@
             color: #e53e3e;
             font-size: 14px;
         }
+        .auth-section {
+            background: #fff5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
+        .password-container {
+            position: relative;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cold Call Tool</h1>
         
-        <!-- Twilio Credentials -->
-        <h3>Step 1: Enter Twilio Credentials</h3>
-        <input type="text" id="accountSid" placeholder="Account SID (starts with 'AC')">
-        <input type="text" id="authToken" placeholder="Auth Token">
-        <input type="text" id="twilioNumber" placeholder="Your Twilio Number (e.g., +15551234)">
-        
-        <!-- Phone Number Input -->
-        <h3>Step 2: Enter Phone Number to Call</h3>
-        <input type="text" id="phoneNumber" placeholder="Paste phone number (e.g., +15559876)">
-        <button id="pasteBtn">📋 Paste Phone Number</button>
-        
-        <!-- Call Button -->
-        <button id="callBtn" class="call-btn" disabled>📞 Start Call</button>
-        <p id="error" class="error"></p>
+        <!-- Secure Auth Section -->
+        <div class="auth-section">
+            <h3>🔐 System Authentication</h3>
+            <div class="password-container">
+                <input type="password" id="adminPassword" placeholder="Enter admin password">
+                <span class="password-toggle" id="togglePassword">👁️</span>
+            </div>
+            <button id="authBtn">Unlock System</button>
+            <p id="authError" class="error"></p>
+        </div>
+
+        <!-- Main App (Hidden Until Authenticated) -->
+        <div id="appSection" style="display:none">
+            <!-- Twilio Number Display -->
+            <h3>Twilio Number: <span id="displayTwilioNumber"></span></h3>
+            
+            <!-- Phone Number Input -->
+            <h3>Step 1: Enter Phone Number to Call</h3>
+            <input type="text" id="phoneNumber" placeholder="Paste phone number (e.g., +15559876)">
+            <button id="pasteBtn">📋 Paste Phone Number</button>
+            
+            <!-- Call Button -->
+            <button id="callBtn" class="call-btn">📞 Start Call</button>
+            <p id="error" class="error"></p>
+            
+            <!-- Call Status -->
+            <div id="callStatus">
+                <p>Call status: <span id="statusText">Ready</span></p>
+                <p id="callTimer">00:00</p>
+            </div>
+        </div>
     </div>
 
-    <div id="callStatus" class="call-status"></div>
-
     <script>
-        const accountSidInput = document.getElementById('accountSid');
-        const authTokenInput = document.getElementById('authToken');
-        const twilioNumberInput = document.getElementById('twilioNumber');
+        // DOM Elements
+        const adminPasswordInput = document.getElementById('adminPassword');
+        const authBtn = document.getElementById('authBtn');
+        const authError = document.getElementById('authError');
+        const appSection = document.getElementById('appSection');
+        const displayTwilioNumber = document.getElementById('displayTwilioNumber');
         const phoneNumberInput = document.getElementById('phoneNumber');
         const pasteBtn = document.getElementById('pasteBtn');
         const callBtn = document.getElementById('callBtn');
         const errorDisplay = document.getElementById('error');
+        const statusText = document.getElementById('statusText');
+        const callTimer = document.getElementById('callTimer');
+        const togglePassword = document.getElementById('togglePassword');
 
-        // Enable call button only when all fields are filled
-        function checkFields() {
-            const allFilled = accountSidInput.value && authTokenInput.value && 
-                             twilioNumberInput.value && phoneNumberInput.value;
-            callBtn.disabled = !allFilled;
-        }
+        // Password visibility toggle
+        togglePassword.addEventListener('click', () => {
+            const type = adminPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            adminPasswordInput.setAttribute('type', type);
+            togglePassword.textContent = type === 'password' ? '👁️' : '👁️‍🗨️';
+        });
 
-        // Auto-check fields on input
-        [accountSidInput, authTokenInput, twilioNumberInput, phoneNumberInput].forEach(input => {
-            input.addEventListener('input', checkFields);
+        // System Authentication
+        authBtn.addEventListener('click', async () => {
+            const password = adminPasswordInput.value;
+            
+            try {
+                const response = await fetch('/.netlify/functions/verify-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    displayTwilioNumber.textContent = data.twilioNumber;
+                    appSection.style.display = 'block';
+                    document.querySelector('.auth-section').style.display = 'none';
+                } else {
+                    authError.textContent = 'Invalid password';
+                }
+            } catch (err) {
+                authError.textContent = 'Authentication service unavailable';
+            }
         });
 
         // Paste phone number
         pasteBtn.addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
-                phoneNumberInput.value = text.replace(/\D/g, ''); // Numbers only
-                checkFields();
+                phoneNumberInput.value = text.replace(/\D/g, '');
             } catch (err) {
-                showError("Couldn't paste. Click inside the box and paste manually.");
+                showError("Couldn't paste. Please paste manually.");
             }
         });
 
-        // Make call via Netlify Function
-        callBtn.addEventListener('click', async () => {
-            callBtn.disabled = true;
-            callBtn.textContent = "Calling...";
-            errorDisplay.textContent = "";
+        // Call Management
+        let callStartTime;
+        let timerInterval;
 
+        callBtn.addEventListener('click', async () => {
             try {
+                callBtn.disabled = true;
+                statusText.textContent = "Connecting...";
+                
                 const response = await fetch('/.netlify/functions/make-call', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        accountSid: accountSidInput.value,
-                        authToken: authTokenInput.value,
-                        twilioNumber: twilioNumberInput.value,
                         toNumber: phoneNumberInput.value
                     })
                 });
 
                 const result = await response.json();
+                
                 if (result.success) {
-                    alert(`Calling ${phoneNumberInput.value}...`);
+                    startCallTimer();
+                    statusText.textContent = `Call connected to ${phoneNumberInput.value}`;
+                    callBtn.textContent = "🛑 End Call";
+                    callBtn.classList.remove('call-btn');
+                    callBtn.classList.add('clear-btn');
                 } else {
-                    showError(result.error || "Call failed. Check credentials.");
+                    showError(result.error || "Call failed");
                 }
             } catch (err) {
                 showError("Network error. Try again.");
             } finally {
-                callBtn.textContent = "📞 Start Call";
                 callBtn.disabled = false;
             }
         });
 
+        function startCallTimer() {
+            callStartTime = new Date();
+            timerInterval = setInterval(() => {
+                const now = new Date();
+                const elapsed = new Date(now - callStartTime);
+                const minutes = elapsed.getUTCMinutes().toString().padStart(2, '0');
+                const seconds = elapsed.getUTCSeconds().toString().padStart(2, '0');
+                callTimer.textContent = `${minutes}:${seconds}`;
+            }, 1000);
+        }
+
         function showError(message) {
             errorDisplay.textContent = message;
+            setTimeout(() => errorDisplay.textContent = '', 5000);
         }
     </script>
 </body>
