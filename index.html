@@ -1,66 +1,209 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Twilio Cold Caller</title>
-  <script src="https://sdk.twilio.com/js/video/releases/2.3.0/twilio-video.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twilio Caller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2d3748;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .number-display {
+            font-size: 24px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            text-align: center;
+            background: #f9f9f9;
+        }
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .key {
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            background: #e2e8f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .key:hover {
+            background: #cbd5e0;
+        }
+        .key:active {
+            background: #a0aec0;
+        }
+        .call-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            background: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .call-btn:hover {
+            background: #38a169;
+        }
+        .paste-btn {
+            width: 100%;
+            padding: 10px;
+            background: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .paste-btn:hover {
+            background: #3182ce;
+        }
+        .credentials {
+            margin-top: 20px;
+        }
+        .credentials input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .clear-btn {
+            background: #f56565;
+            color: white;
+        }
+        .clear-btn:hover {
+            background: #e53e3e;
+        }
+    </style>
 </head>
 <body>
-  <input type="text" id="toNumber" placeholder="Number to call (e.g., +15195551234)">
-  <button id="callButton">Start Call</button>
-  <button id="hangupButton" disabled>Hang Up</button>
-  <div id="status"></div>
+    <div class="container">
+        <h1>Twilio Phone Call</h1>
+        
+        <!-- Phone Number Input -->
+        <div class="number-display" id="phoneNumber"></div>
+        <button class="paste-btn" id="pasteBtn">📋 Paste Phone Number</button>
+        
+        <!-- Keypad -->
+        <div class="keypad">
+            <button class="key" data-number="1">1</button>
+            <button class="key" data-number="2">2</button>
+            <button class="key" data-number="3">3</button>
+            <button class="key" data-number="4">4</button>
+            <button class="key" data-number="5">5</button>
+            <button class="key" data-number="6">6</button>
+            <button class="key" data-number="7">7</button>
+            <button class="key" data-number="8">8</button>
+            <button class="key" data-number="9">9</button>
+            <button class="key" data-number="*">*</button>
+            <button class="key" data-number="0">0</button>
+            <button class="key" data-number="#">#</button>
+        </div>
+        
+        <!-- Clear & Call Buttons -->
+        <button class="key clear-btn" id="clearBtn">Clear</button>
+        <button class="call-btn" id="callBtn">📞 Call via Twilio</button>
+        
+        <!-- Twilio Credentials -->
+        <div class="credentials">
+            <h3>Twilio Credentials</h3>
+            <input type="text" id="accountSid" placeholder="Account SID">
+            <input type="text" id="authToken" placeholder="Auth Token">
+            <input type="text" id="twilioNumber" placeholder="Twilio Phone Number (e.g., +1234567890)">
+        </div>
+    </div>
 
-  <script>
-    let device;
-    let connection;
-
-    // Initialize Twilio Device
-    async function initializeDevice() {
-      const response = await fetch('/.netlify/functions/get-token');
-      const { token } = await response.json();
-      
-      device = new Twilio.Device(token, {
-        codecPreferences: ['opus', 'pcmu'],
-        logLevel: 'debug'
-      });
-
-      device.on('ready', () => {
-        document.getElementById('status').textContent = 'Ready to call!';
-      });
-
-      device.on('error', (error) => {
-        console.error('Device error:', error);
-        document.getElementById('status').textContent = `Error: ${error.message}`;
-      });
-
-      device.on('disconnect', () => {
-        document.getElementById('hangupButton').disabled = true;
-        document.getElementById('callButton').disabled = false;
-      });
-    }
-
-    // Start the call
-    document.getElementById('callButton').addEventListener('click', async () => {
-      const toNumber = document.getElementById('toNumber').value;
-      document.getElementById('status').textContent = 'Calling...';
-      
-      const params = {
-        To: toNumber,
-        Agent: 'browser' // Identifier for browser-based caller
-      };
-
-      connection = await device.connect({ params });
-      document.getElementById('callButton').disabled = true;
-      document.getElementById('hangupButton').disabled = false;
-    });
-
-    // Hang up
-    document.getElementById('hangupButton').addEventListener('click', () => {
-      device.disconnectAll();
-      document.getElementById('status').textContent = 'Call ended.';
-    });
-
-    initializeDevice();
-  </script>
+    <script>
+        const phoneNumberDisplay = document.getElementById('phoneNumber');
+        const pasteBtn = document.getElementById('pasteBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const callBtn = document.getElementById('callBtn');
+        const keypadButtons = document.querySelectorAll('.key[data-number]');
+        
+        let phoneNumber = '';
+        
+        // Keypad input
+        keypadButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                phoneNumber += button.getAttribute('data-number');
+                phoneNumberDisplay.textContent = phoneNumber;
+            });
+        });
+        
+        // Paste from clipboard
+        pasteBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                phoneNumber = text.replace(/\D/g, ''); // Remove non-digits
+                phoneNumberDisplay.textContent = phoneNumber;
+            } catch (err) {
+                alert('Failed to paste. Check clipboard permissions.');
+            }
+        });
+        
+        // Clear number
+        clearBtn.addEventListener('click', () => {
+            phoneNumber = '';
+            phoneNumberDisplay.textContent = '';
+        });
+        
+        // Initiate Twilio Call (via Netlify Function)
+        callBtn.addEventListener('click', async () => {
+            const accountSid = document.getElementById('accountSid').value;
+            const authToken = document.getElementById('authToken').value;
+            const twilioNumber = document.getElementById('twilioNumber').value;
+            
+            if (!phoneNumber || !accountSid || !authToken || !twilioNumber) {
+                alert('Please fill in all fields!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/.netlify/functions/twilio-call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accountSid,
+                        authToken,
+                        twilioNumber,
+                        toNumber: phoneNumber
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Calling ${phoneNumber}...`);
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to call'));
+                }
+            } catch (err) {
+                alert('Network error. Check console.');
+                console.error(err);
+            }
+        });
+    </script>
 </body>
 </html>
