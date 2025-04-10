@@ -62,13 +62,18 @@
     <div class="container">
         <h1>Cold Call Tool</h1>
 
+        <!-- Twilio Credentials Section -->
+        <div id="credentialsSection">
+            <h3>Step 1: Enter Twilio Credentials</h3>
+            <input type="text" id="accountSid" placeholder="Twilio Account SID">
+            <input type="password" id="authToken" placeholder="Twilio Auth Token">
+            <input type="text" id="twilioNumber" placeholder="Your Twilio Phone Number">
+        </div>
+
         <!-- Main App Section -->
         <div id="appSection">
-            <!-- Twilio Number Display -->
-            <h3>Twilio Number: <span id="displayTwilioNumber"></span></h3>
-            
             <!-- Phone Number Input -->
-            <h3>Step 1: Enter Phone Number to Call</h3>
+            <h3>Step 2: Enter Phone Number to Call</h3>
             <input type="text" id="phoneNumber" placeholder="Paste phone number (e.g., +15559876)">
             <button id="pasteBtn">📋 Paste Phone Number</button>
             
@@ -86,7 +91,9 @@
 
     <script>
     // DOM Elements
-    const displayTwilioNumber = document.getElementById('displayTwilioNumber');
+    const accountSidInput = document.getElementById('accountSid');
+    const authTokenInput = document.getElementById('authToken');
+    const twilioNumberInput = document.getElementById('twilioNumber');
     const phoneNumberInput = document.getElementById('phoneNumber');
     const pasteBtn = document.getElementById('pasteBtn');
     const callBtn = document.getElementById('callBtn');
@@ -136,7 +143,16 @@
     };
 
     callBtn.addEventListener('click', async () => {
+        const accountSid = accountSidInput.value;
+        const authToken = authTokenInput.value;
+        const twilioNumber = twilioNumberInput.value;
         const phoneNumber = phoneNumberInput.value;
+
+        if (!accountSid || !authToken || !twilioNumber) {
+            showError('Please enter all Twilio credentials.');
+            return;
+        }
+
         if (!isValidPhoneNumber(phoneNumber)) {
             showError('Invalid phone number. Please enter a valid number in E.164 format.');
             return;
@@ -149,7 +165,7 @@
             const response = await fetch('/.netlify/functions/make-call', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ toNumber: phoneNumber })
+                body: JSON.stringify({ accountSid, authToken, twilioNumber, toNumber: phoneNumber })
             });
 
             const result = await response.json();
